@@ -19,6 +19,11 @@ key. Builds receive only the corresponding CNG public-key blob and its pinned
 SHA-256 fingerprint. The signing service submits module digests to Managed HSM
 and never retrieves private-key material.
 
+The preferred primary deployment region is `swedencentral`. Confirm Managed
+HSM availability and subscription quota in the authenticated tenant immediately
+before provisioning. If Sweden Central is unavailable, use `northeurope` as the
+EU fallback only after recording the data-residency and billing decision.
+
 Provisioning is intentionally blocked until all of these owner-controlled
 inputs exist:
 
