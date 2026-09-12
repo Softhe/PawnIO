@@ -1,2 +1,7 @@
 cmake-build-*
 .idea
+
+# Private signing material must never enter source control.
+*.key
+*.pem
+*.pfx
