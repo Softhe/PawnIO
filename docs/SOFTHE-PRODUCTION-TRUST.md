@@ -11,6 +11,32 @@ placed in ordinary CI secrets, copied into release artifacts, or installed on
 test machines. Production signing should use a non-exportable HSM or managed
 key and a two-person release procedure.
 
+## Selected key-custody architecture
+
+The selected production target is Azure Key Vault Managed HSM. The module RSA
+private key will be generated inside Managed HSM as a non-exportable signing
+key. Builds receive only the corresponding CNG public-key blob and its pinned
+SHA-256 fingerprint. The signing service submits module digests to Managed HSM
+and never retrieves private-key material.
+
+Provisioning is intentionally blocked until all of these owner-controlled
+inputs exist:
+
+- an Azure tenant and subscription with an accepted billing owner;
+- a globally unique Managed HSM resource name and deployment region;
+- named HSM administrators and least-privilege module-signing identities;
+- at least three independently stored RSA recovery key pairs and a chosen
+  recovery quorum;
+- approved offline storage for the encrypted security-domain backup and its
+  recovery private keys;
+- an agreed retention and purge-protection period, because an HSM can remain
+  billable throughout retention;
+- a verified legal publisher identity for Microsoft Hardware Developer Program
+  enrollment.
+
+No production module key is generated before the recovery ceremony. Test
+fixtures and mutated public blobs are never eligible for production trust.
+
 ## Production configuration
 
 Configure a production candidate with all of the following:
