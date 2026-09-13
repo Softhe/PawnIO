@@ -54,6 +54,68 @@ set(PAWNIO_DATE "03/11/2026" CACHE STRING "The date of the driver, used in inf f
 
 option(PAWNIO_UNRESTRICTED "Whether to build an unrestricted version of the driver" OFF)
 
+option(PAWNIO_PRODUCTION_BUILD "Enforce the independently signed production-driver profile" OFF)
+option(PAWNIO_TRUST_UPSTREAM "Trust modules signed by the upstream PawnIO module key" ON)
+set(PAWNIO_CUSTOM_TRUST_KEY_BLOB "" CACHE FILEPATH
+    "Raw 4096-bit CNG BCRYPT_RSAPUBLIC_BLOB trusted for module signing")
+set(PAWNIO_CUSTOM_TRUST_KEY_SHA256 "" CACHE STRING
+    "Pinned lowercase SHA-256 of the custom module trust-key blob")
+
+if (PAWNIO_PRODUCTION_BUILD)
+    if (PAWNIO_UNRESTRICTED)
+        message(FATAL_ERROR "Production builds cannot enable PAWNIO_UNRESTRICTED")
+    endif ()
+    if (PAWNIO_TRUST_UPSTREAM)
+        message(FATAL_ERROR "Softhe production builds must use only the explicitly supplied custom module key")
+    endif ()
+    if (PAWNIO_CUSTOM_TRUST_KEY_BLOB STREQUAL "")
+        message(FATAL_ERROR "Softhe production builds require PAWNIO_CUSTOM_TRUST_KEY_BLOB")
+    endif ()
+    string(LENGTH "${PAWNIO_CUSTOM_TRUST_KEY_SHA256}" PAWNIO_CUSTOM_TRUST_KEY_SHA256_LENGTH)
+    if (NOT PAWNIO_CUSTOM_TRUST_KEY_SHA256_LENGTH EQUAL 64 OR
+        PAWNIO_CUSTOM_TRUST_KEY_SHA256 MATCHES "[^0-9a-f]")
+        message(FATAL_ERROR "Softhe production builds require a pinned lowercase PAWNIO_CUSTOM_TRUST_KEY_SHA256")
+    endif ()
+    if (PAWNIO_NAME STREQUAL "PawnIO" OR PAWNIO_AUTHOR STREQUAL "namazso")
+        message(FATAL_ERROR "Softhe production builds require distinct driver naming and authorship")
+    endif ()
+endif ()
+
+if (NOT PAWNIO_CUSTOM_TRUST_KEY_BLOB STREQUAL "")
+    if (NOT EXISTS "${PAWNIO_CUSTOM_TRUST_KEY_BLOB}")
+        message(FATAL_ERROR "Custom module trust-key blob does not exist: ${PAWNIO_CUSTOM_TRUST_KEY_BLOB}")
+    endif ()
+    file(READ "${PAWNIO_CUSTOM_TRUST_KEY_BLOB}" PAWNIO_CUSTOM_TRUST_KEY_HEX HEX)
+    string(LENGTH "${PAWNIO_CUSTOM_TRUST_KEY_HEX}" PAWNIO_CUSTOM_TRUST_KEY_HEX_LENGTH)
+    if (NOT PAWNIO_CUSTOM_TRUST_KEY_HEX_LENGTH EQUAL 1078)
+        message(FATAL_ERROR
+            "Custom module trust key must be a 539-byte, 4096-bit CNG BCRYPT_RSAPUBLIC_BLOB")
+    endif ()
+    string(SUBSTRING "${PAWNIO_CUSTOM_TRUST_KEY_HEX}" 0 48 PAWNIO_CUSTOM_TRUST_KEY_HEADER_HEX)
+    string(SUBSTRING "${PAWNIO_CUSTOM_TRUST_KEY_HEX}" 48 6 PAWNIO_CUSTOM_TRUST_KEY_EXPONENT_HEX)
+    if (NOT PAWNIO_CUSTOM_TRUST_KEY_HEADER_HEX STREQUAL "525341310010000003000000000200000000000000000000" OR
+        NOT PAWNIO_CUSTOM_TRUST_KEY_EXPONENT_HEX STREQUAL "010001")
+        message(FATAL_ERROR
+            "Custom module trust key must use a 4096-bit RSA public key with exponent 65537")
+    endif ()
+    file(SHA256 "${PAWNIO_CUSTOM_TRUST_KEY_BLOB}" PAWNIO_CUSTOM_TRUST_KEY_ACTUAL_SHA256)
+    string(TOLOWER "${PAWNIO_CUSTOM_TRUST_KEY_ACTUAL_SHA256}" PAWNIO_CUSTOM_TRUST_KEY_ACTUAL_SHA256)
+    if (PAWNIO_PRODUCTION_BUILD AND
+        PAWNIO_CUSTOM_TRUST_KEY_ACTUAL_SHA256 STREQUAL "724af6ac42e7a4cbbbe3e4a5a0117af0fd98364a72c2aee40972228838400e59")
+        message(FATAL_ERROR "Softhe production builds cannot reuse the upstream PawnIO module key")
+    endif ()
+    if (NOT PAWNIO_CUSTOM_TRUST_KEY_SHA256 STREQUAL "" AND
+        NOT PAWNIO_CUSTOM_TRUST_KEY_ACTUAL_SHA256 STREQUAL PAWNIO_CUSTOM_TRUST_KEY_SHA256)
+        message(FATAL_ERROR "Custom module trust-key SHA-256 does not match its pinned fingerprint")
+    endif ()
+    string(REGEX REPLACE "([0-9a-fA-F][0-9a-fA-F])" "0x\\1, "
+        PAWNIO_CUSTOM_TRUST_KEY_BYTES "${PAWNIO_CUSTOM_TRUST_KEY_HEX}")
+    file(CONFIGURE
+        OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/generated/custom_trusted_key.h"
+        CONTENT "constexpr static uint8_t k_pubkey_custom[] = { @PAWNIO_CUSTOM_TRUST_KEY_BYTES@ };\n"
+        @ONLY)
+endif ()
+
 set(SIGN_SCRIPT "" CACHE STRING "Signing script, called like <script> <input> <output>")
 
 set(CMAKE_CXX_STANDARD 20)

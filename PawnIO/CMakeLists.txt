@@ -3,6 +3,7 @@ wdk_add_driver(PawnIO
         src/driver.cpp
         src/natives_impl_windows.cpp
         src/signature.cpp
+        src/module_trust.cpp
         src/vm.cpp
         $<$<STREQUAL:"${WDK_PLATFORM}","arm64">:src/msrmrs.cpp>
         $<$<STREQUAL:"${WDK_PLATFORM}","x64">:src/x64.asm>
@@ -46,6 +47,19 @@ target_link_options(PawnIO PRIVATE
 
 if (PAWNIO_UNRESTRICTED)
     target_compile_definitions(PawnIO PRIVATE PAWNIO_UNRESTRICTED)
+endif ()
+
+if (PAWNIO_TRUST_UPSTREAM)
+    target_compile_definitions(PawnIO PRIVATE PAWNIO_TRUST_UPSTREAM)
+endif ()
+
+if (PAWNIO_PRODUCTION_BUILD)
+    target_compile_definitions(PawnIO PRIVATE PAWNIO_PRODUCTION_BUILD)
+endif ()
+
+if (NOT PAWNIO_CUSTOM_TRUST_KEY_BLOB STREQUAL "")
+    target_compile_definitions(PawnIO PRIVATE PAWNIO_TRUST_CUSTOM)
+    target_include_directories(PawnIO PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/../generated")
 endif ()
 
 set_target_properties(PawnIO PROPERTIES OUTPUT_NAME "${PAWNIO_NAME}_unsigned")
